@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            border: 1px solid #000;
+        }
+
+        #scoreboard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 18px;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 24px;
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+    </style>
+    <title>Snake Game</title>
+</head>
+
+<body>
+    <div id="menu">
+        <h1>Snake Game</h1>
+        <button onclick="startGame('baby')">Baby</button>
+        <button onclick="startGame('easy')">Easy</button>
+        <button onclick="startGame('medium')">Medium</button>
+        <button onclick="startGame('hard')">Hard</button>
+        <button onclick="startGame('impossible')">Impossible</button>
+    </div>
+
+    <canvas id="snakeCanvas" style="display: none;"></canvas>
+    <div id="scoreboard" style="display: none;">Score: 0 | Highest Score: 0 | Speed: 0 | Lives: 3</div>
+
+    <script>
+        const canvas = document.getElementById("snakeCanvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const boxSize = 20;
+        const obstacleSize = 20;
+        let snake = [{ x: 10, y: 10 }];
+        let food = { x: 15, y: 15 };
+        let obstacles = [];
+        let direction = "right";
+        let gameInterval;
+        let speed = 150;
+        let score = 0;
+        let highestScore = 0;
+        let lives = 3;
+
+        function startGame(difficulty) {
+            score = 0; // Reset score to zero when starting a new game
+            document.getElementById("menu").style.display = "none";
+            document.getElementById("snakeCanvas").style.display = "block";
+            document.getElementById("scoreboard").style.display = "block";
+
+            if (difficulty === "baby") {
+                speed = 225;
+                lives = 10; 
+            } else if (difficulty === "easy") {
+                speed = 150;
+                lives = 7; 
+            } else if (difficulty === "medium") {
+                speed = 100;
+                lives = 5; 
+            } else if (difficulty === "hard") {
+                speed = 60;
+                lives = 3; 
+            } else if (difficulty === "impossible") {
+                speed = 40;
+                lives = 1; 
+            }
+
+            snake = [{ x: 10, y: 10 }];
+            food = {
+                x: Math.floor(Math.random() * (canvas.width / boxSize)),
+                y: Math.floor(Math.random() * (canvas.height / boxSize))
+            };
+            generateObstacles();
+            direction = "right";
+            updateScoreboard();
+            clearInterval(gameInterval);
+            gameInterval = setInterval(draw, speed);
+        }
+
+        function generateObstacles() {
+            obstacles = [];
+            const numObstacles = Math.floor(Math.random() * 90 + 62);
+            for (let i = 0; i < numObstacles; i++) {
+                let obstacle = generateObstacleLocation();
+                obstacles.push(obstacle);
+            }
+        }
+
+        function generateObstacleLocation() {
+            let obstacle;
+            do {
+                obstacle = {
+                    x: Math.floor(Math.random() * (canvas.width / boxSize)),
+                    y: Math.floor(Math.random() * (canvas.height / boxSize))
+                };
+            } while (isWithinSnakeRadius(obstacle, 5));
+
+            return obstacle;
+        }
+
+        function isWithinSnakeRadius(position, radius) {
+            for (let i = 0; i < snake.length; i++) {
+                if (Math.abs(position.x - snake[i].x) <= radius && Math.abs(position.y - snake[i].y) <= radius) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function updateScoreboard() {
+            const scoreboard = document.getElementById("scoreboard");
+            scoreboard.textContent = `Score: ${score} | Highest Score: ${highestScore} | Speed: ${1000 / speed} | Lives: ${lives}`;
+        }
+
+        function draw() {
+            let newHead = { x: snake[0].x, y: snake[0].y };
+            if (direction === "right") newHead.x++;
+            else if (direction === "left") newHead.x--;
+            else if (direction === "up") newHead.y--;
+            else if (direction === "down") newHead.y++;
+
+            if (checkCollisionWithObstacles(newHead) || checkCollisionWithWall(newHead)) {
+                handleCollision();
+                return;
+            }
+
+            snake.unshift(newHead);
+
+            if (newHead.x === food.x && newHead.y === food.y) {
+                food = {
+                    x: Math.floor(Math.random() * (canvas.width / boxSize)),
+                    y: Math.floor(Math.random() * (canvas.height / boxSize))
+                };
+                score++;
+                updateScoreboard();
+            } else {
+                if (snake.length > score + 1) {
+                    snake.pop();
+                }
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "gray";
+            for (let i = 0; i < obstacles.length; i++) {
+                ctx.fillRect(obstacles[i].x * boxSize, obstacles[i].y * boxSize, obstacleSize, obstacleSize);
+            }
+
+            for (let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = i === 0 ? "green" : "white";
+                ctx.fillRect(snake[i].x * boxSize, snake[i].y * boxSize, boxSize, boxSize);
+                ctx.strokeStyle = "black";
+                ctx.strokeRect(snake[i].x * boxSize, snake[i].y * boxSize, boxSize, boxSize);
+            }
+
+            ctx.fillStyle = "red";
+            ctx.fillRect(food.x * boxSize, food.y * boxSize, boxSize, boxSize);
+        }
+
+        function checkCollisionWithObstacles(head) {
+            for (let i = 0; i < obstacles.length; i++) {
+                if (head.x === obstacles[i].x && head.y === obstacles[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkCollisionWithWall(head) {
+            return (
+                head.x < 0 || head.x >= canvas.width / boxSize ||
+                head.y < 0 || head.y >= canvas.height / boxSize
+            );
+        }
+
+        function handleCollision() {
+            lives--;
+
+            if (lives === 0) {
+                handleGameOver();
+            } else {
+                // Reset the snake and update the scoreboard
+                snake = [{ x: 10, y: 10 }];
+                direction = "right";
+                updateScoreboard();
+            }
+        }
+
+        function handleGameOver() {
+            document.getElementById("menu").style.display = "block";
+            document.getElementById("snakeCanvas").style.display = "none";
+            document.getElementById("scoreboard").style.display = "none";
+
+            clearInterval(gameInterval);
+            alert(`Game Over! Your Score: ${score} | Highest Score: ${highestScore}`);
+            if (score > highestScore) {
+                highestScore = score;
+            }
+        }
+
+        function changeDirection(e) {
+            if (e.key === "ArrowUp" && direction !== "down") direction = "up";
+            else if (e.key === "ArrowDown" && direction !== "up") direction = "down";
+            else if (e.key === "ArrowLeft" && direction !== "right") direction = "left";
+            else if (e.key === "ArrowRight" && direction !== "left") direction = "right";
+        }
+
+        document.addEventListener("keydown", changeDirection);
+        
+    </script>
+</body>
+
+</html>
